@@ -1,8 +1,12 @@
-// In-memory knowledge graph store. Persists to /tmp on Vercel (ephemeral) — for production
-// switch to Vercel KV/Postgres. Schema matches claude-hub-private/10-knowledge-graph/schema.json.
+// Knowledge graph store.
+// Backend selection:
+//   - If SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY env present -> use Supabase
+//     (persistent, queryable, recommended for production)
+//   - Else fallback to JSON file on /tmp (ephemeral on Vercel — only good for dev / demo)
 
 import { promises as fs } from "fs";
 import path from "path";
+import { getSupabase, isSupabaseAvailable } from "./supabase";
 
 export type NodeType = "Agent" | "Skill" | "Domain" | "DataFlow" | "Context" | "Generation";
 export type EdgeType = "CALLS" | "HAS_SKILL" | "PRODUCES" | "USES_MODEL" | "REFERENCES" | "TRIGGERED_BY";
@@ -88,36 +92,46 @@ export async function logGeneration(input: {
   startedAt: string;
   finishedAt: string;
   error?: string;
+  payload?: unknown;
 }): Promise<void> {
-  const graph = await load();
-  const node: KGNode = {
-    type: "Generation",
-    id: input.runId,
-    name: `${input.agentId} · ${input.topic.slice(0, 60)}`,
-    properties: {
-      agent: input.agentId,
+  // Prefer Supabase if available
+  if (isSupabaseAvailable()) {
+    const sb = getSupabase()!;
+    const { error } = await sb.from("generations").insert({
+      id: input.runId,
+      agent_id: input.agentId,
       model: input.model,
       topic: input.topic,
       ok: input.ok,
       error: input.error,
-      startedAt: input.startedAt,
-      finishedAt: input.finishedAt,
+      payload: input.payload ?? null,
+      started_at: input.startedAt,
+      finished_at: input.finishedAt,
+    });
+    if (error) console.error("Supabase log error:", error);
+    // edges
+    await sb.from("kg_edges").insert([
+      { from_node: input.runId, to_node: input.agentId, edge_type: "TRIGGERED_BY" },
+      { from_node: input.runId, to_node: input.model, edge_type: "USES_MODEL" },
+    ]);
+    return;
+  }
+
+  // Fallback: JSON file
+  const graph = await load();
+  graph.nodes.push({
+    type: "Generation",
+    id: input.runId,
+    name: `${input.agentId} · ${input.topic.slice(0, 60)}`,
+    properties: {
+      agent: input.agentId, model: input.model, topic: input.topic,
+      ok: input.ok, error: input.error,
+      startedAt: input.startedAt, finishedAt: input.finishedAt,
     },
     createdAt: input.startedAt,
-  };
-  graph.nodes.push(node);
-  graph.edges.push({
-    from: input.runId,
-    to: input.agentId,
-    type: "TRIGGERED_BY",
-    createdAt: input.startedAt,
   });
-  graph.edges.push({
-    from: input.runId,
-    to: input.model,
-    type: "USES_MODEL",
-    createdAt: input.startedAt,
-  });
+  graph.edges.push({ from: input.runId, to: input.agentId, type: "TRIGGERED_BY", createdAt: input.startedAt });
+  graph.edges.push({ from: input.runId, to: input.model, type: "USES_MODEL", createdAt: input.startedAt });
   await save(graph);
 }
 
@@ -130,8 +144,43 @@ export async function queryRelevantGenerations(opts: {
   topicKeywords?: string[];
   topN?: number;
 }): Promise<KGNode[]> {
-  const graph = await load();
   const topN = opts.topN ?? 5;
+
+  if (isSupabaseAvailable()) {
+    const sb = getSupabase()!;
+    let q = sb.from("generations").select("*").order("started_at", { ascending: false }).limit(topN * 4);
+    if (opts.agentId) q = q.eq("agent_id", opts.agentId);
+    const { data, error } = await q;
+    if (error) {
+      console.error("Supabase query error:", error);
+      return [];
+    }
+    // keyword score
+    const scored = (data ?? []).map((row) => {
+      let score = opts.agentId && row.agent_id === opts.agentId ? 10 : 0;
+      if (opts.topicKeywords?.length && row.topic) {
+        const t = String(row.topic).toLowerCase();
+        score += opts.topicKeywords.filter((k) => t.includes(k.toLowerCase())).length * 3;
+      }
+      return { row, score };
+    });
+    return scored
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, topN)
+      .map((x) => ({
+        type: "Generation" as const,
+        id: x.row.id,
+        name: `${x.row.agent_id} · ${String(x.row.topic ?? "").slice(0, 60)}`,
+        properties: {
+          agent: x.row.agent_id, model: x.row.model, topic: x.row.topic,
+          ok: x.row.ok, startedAt: x.row.started_at, finishedAt: x.row.finished_at,
+        },
+      }));
+  }
+
+  // Fallback
+  const graph = await load();
   const gens = graph.nodes.filter((n) => n.type === "Generation");
   const scored = gens.map((n) => {
     let score = 0;
@@ -147,4 +196,8 @@ export async function queryRelevantGenerations(opts: {
     .sort((a, b) => b.score - a.score)
     .slice(0, topN)
     .map((x) => x.n);
+}
+
+export function getStorageBackend(): "supabase" | "json-file" {
+  return isSupabaseAvailable() ? "supabase" : "json-file";
 }
