@@ -3,16 +3,18 @@
   "mcpServers": {
     "supabase": {
       "command": "npx",
-      "args": ["-y", "@supabase/mcp-server-supabase@latest"],
-      "env": {
-        "SUPABASE_ACCESS_TOKEN": "$SUPABASE_ACCESS_TOKEN"
-      }
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--access-token",
+        "${SUPABASE_ACCESS_TOKEN}"
+      ]
     },
     "vercel": {
       "type": "http",
       "url": "https://mcp.vercel.com",
       "headers": {
-        "Authorization": "Bearer $VERCEL_TOKEN"
+        "Authorization": "Bearer ${VERCEL_TOKEN}"
       }
     }
   }
