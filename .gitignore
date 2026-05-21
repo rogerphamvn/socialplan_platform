@@ -12,3 +12,6 @@ dist
 .turbo
 next-env.d.ts
 tsconfig.tsbuildinfo
+scripts/deploy-log-last.txt
+.claude/projects/
+.claude/worktrees/

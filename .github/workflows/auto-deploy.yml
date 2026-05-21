@@ -1,0 +1,62 @@
+name: Auto-deploy via Claude Code
+
+on:
+  push:
+    branches:
+      - claude/pending-request-QUx0g
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Why are we redeploying?"
+        required: false
+        default: "manual trigger"
+
+# Single deploy at a time per ref -- cancel any in-flight run if a new
+# commit arrives.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write    # so claude can push the DEPLOYMENT_STATUS.md update
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0    # full history so claude can git log diff
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run autonomous deploy
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt_file: scripts/deploy-prompt.md
+          # MCP and tool allow-list are loaded from .claude/settings.json
+          # in the repo. The two MCP servers (Supabase + Vercel) are
+          # configured in .mcp.json with ${VAR} substitution from these
+          # env vars:
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Surface deploy report
+        if: always()
+        run: |
+          if [ -f scripts/deploy-log-last.txt ]; then
+            echo "::group::Claude deploy log"
+            tail -200 scripts/deploy-log-last.txt
+            echo "::endgroup::"
+          fi

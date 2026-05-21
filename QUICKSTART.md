@@ -2,6 +2,15 @@
 
 Mục tiêu: setup 1 lần ~5 phút trên máy bạn → Claude tự deploy mọi project sau, không cần click dashboard.
 
+## TL;DR — lệnh thường dùng
+
+| Tình huống | Lệnh |
+|---|---|
+| **First-time setup** | `powershell -ExecutionPolicy Bypass -File scripts\setup-local.ps1` (Windows) hoặc `bash scripts/setup-local.sh` |
+| **Auto-deploy (local, 1 lệnh, 0 click)** | `powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1` hoặc `bash scripts/deploy.sh` |
+| **Auto-deploy (cloud, 0 lệnh)** | Push to `claude/pending-request-QUx0g` → GitHub Actions chạy `.github/workflows/auto-deploy.yml` |
+| **Interactive Claude session** | `claude` |
+
 ## 1. Clone repo về local
 
 ```bash
@@ -88,6 +97,58 @@ Claude sẽ:
 6. Trả về production URL + `bootstrap-report.md`
 
 Không click dashboard. Mỗi case study được KG ghi nhớ → lần sau nhanh hơn.
+
+## Autonomous re-deploy (0 prompts, 0 clicks)
+
+Sau khi setup-local đã chạy 1 lần, lần sau redeploy chỉ cần:
+
+### Local — 1 lệnh
+
+```powershell
+# Windows
+powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
+```
+
+```bash
+# Mac/Linux/WSL
+bash scripts/deploy.sh
+```
+
+Script tự:
+1. Verify env vars + CLI + settings còn nguyên
+2. `git pull` latest
+3. Chạy `claude -p` headless với `scripts/deploy-prompt.md` làm prompt
+4. `.claude/settings.json` allow-list bao trùm 28 Bash patterns + 14 MCP tools → không có permission prompt
+5. Parse output → exit 0 (SUCCESS) hoặc exit 2 (FAILED) với NOTES
+6. Lưu full log vào `scripts/deploy-log-last.txt` (gitignored)
+
+### Cloud — 0 lệnh (TRUE autonomous)
+
+Khi push 1 commit lên branch `claude/pending-request-QUx0g`, GitHub Actions
+workflow `.github/workflows/auto-deploy.yml` tự kích hoạt và chạy hệt như
+local — nhưng trên runner của GitHub, không cần máy bạn online.
+
+**Một-time setup trên GitHub** (Repo Settings → Secrets and variables → Actions):
+
+| Secret name | Value |
+|---|---|
+| `ANTHROPIC_API_KEY` | Lấy ở https://console.anthropic.com/settings/keys |
+| `SUPABASE_ACCESS_TOKEN` | PAT đã có ở local |
+| `VERCEL_TOKEN` | Token đã có ở local |
+
+Sau khi 3 secret đã set, mỗi commit lên branch là auto-deploy.
+
+Workflow có `workflow_dispatch` → vào tab **Actions** trên GitHub có thể bấm
+nút "Run workflow" để re-deploy thủ công mà không cần push commit mới.
+
+### Edit deploy behaviour
+
+File `scripts/deploy-prompt.md` là prompt Claude sẽ chạy. Edit file này để
+thay đổi flow (thêm/bớt step, đổi smoke-test URL, format final report khác).
+Cả local script + GitHub Actions đều đọc file này.
+
+File `.claude/settings.json` là allow-list. Nếu deploy bị block vì 1 tool
+mới chưa nằm trong allow-list, append vào field `permissions.allow`.
 
 ## Troubleshooting
 
