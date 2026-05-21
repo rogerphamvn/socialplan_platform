@@ -1,6 +1,14 @@
 # Deployment Status — socialplan-platform
 
-> Last updated: 2026-05-21 (Windows local Claude Code session, Roger's machine)
+> Last updated: 2026-05-22 (Windows local Claude Code session, Roger's machine)
+
+## Final state
+
+- **Production URL:** https://socialplan-platform.vercel.app
+- **Deployment ID:** `dpl_GPtVia3FFhobtxXaCJ8iZoztaS4t`
+- **Deploy completed:** 2026-05-21
+- **Build duration:** ~54s, region `sin1`
+- **Notes:** `NEXT_PUBLIC_*` stored as `plain` (they're embedded in client JS at build time anyway). `SUPABASE_SERVICE_ROLE_KEY` stored as `encrypted`. The `service_role` secret had to be pasted manually once — neither the Supabase MCP nor the Vercel MCP could supply / set it on its own, so it was injected via the Vercel REST API fallback (`POST /v10/projects/.../env` with `$VERCEL_TOKEN`). See `memory/vercel-mcp-no-env-management.md` and `memory/supabase-mcp-no-service-role.md` for why the MCP-only path is structurally blocked.
 
 ## TL;DR — current state
 
@@ -9,9 +17,9 @@
 | Supabase project | LIVE | `hxznewvcvpqiyzdyhwdd` @ ap-southeast-1 |
 | Supabase migrations | APPLIED | 7 tables from `001_init` |
 | Vercel project | EXISTS | `socialplan-platform` under team `mailcoms-projects` |
-| Vercel deployment | DEPLOYED | preview build URL: see below |
-| Vercel env vars (3) | PARTIAL | needs `SUPABASE_SERVICE_ROLE_KEY` + verify URL/ANON |
-| Production smoke test | PENDING | run after env vars are complete + redeploy |
+| Vercel deployment | DEPLOYED | production: https://socialplan-platform.vercel.app |
+| Vercel env vars (3) | DONE | all 3 set on production + preview + development |
+| Production smoke test | PASS | `GET /` → HTTP 200 (ttfb ~1.2s) |
 
 ## Identifiers
 
@@ -43,56 +51,22 @@ campaigns
 
 (7 tables total — verify with `mcp__supabase__list_tables` if in doubt)
 
-## Required Vercel env vars
+## Vercel env vars (all set 2026-05-21)
 
-| Name | Where to get | Set yet? |
-|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://hxznewvcvpqiyzdyhwdd.supabase.co` | check |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase dashboard > Settings > API > anon public | check |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase dashboard > Settings > API > service_role (secret) | **TODO** |
+| Name | Type | Target | Vercel env ID |
+|---|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | plain | production, preview, development | `MI1frJriaVEFKeKg` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | plain | production, preview, development | `KwAwpJWLB7RwAwpC` |
+| `SUPABASE_SERVICE_ROLE_KEY` | encrypted | production, preview, development | `D9xUWMlvuggCC0u8` |
 
-After all 3 set → trigger redeploy → Postgres KG persistence activates in the app.
+## Lessons captured this session
 
-## To resume in a fresh Claude Code session
+Saved to `C:\Users\admin\.claude\projects\C--Users-admin-Projects-socialplan-platform\memory\`:
 
-### Pre-flight (one-time per machine, already done on Roger's Windows)
-
-1. Claude Code CLI installed: `claude --version`
-2. Env vars persisted: `$env:SUPABASE_ACCESS_TOKEN` + `$env:VERCEL_TOKEN` non-empty
-3. MCP servers connected: `/mcp` shows `supabase` + `vercel` both ✓ connected
-
-If any of the above fails, re-run `bash scripts/setup-local.sh` (Mac/Linux) or `powershell -ExecutionPolicy Bypass -File scripts\setup-local.ps1` (Windows).
-
-See `QUICKSTART.md` for full first-time setup. See `MCP_SETUP.md` for architecture.
-
-### Resume command (copy-paste into Claude Code TUI)
-
-```
-Continue the deploy of socialplan-platform.
-
-State so far (from DEPLOYMENT_STATUS.md):
-- Supabase project hxznewvcvpqiyzdyhwdd: migration 001_init applied, 7 tables live
-- Vercel project socialplan-platform (prj_aXgCyx0ZXHOSoxpBjQ4i7Hxd1tUt) exists
-- Env vars status: incomplete — at minimum SUPABASE_SERVICE_ROLE_KEY missing
-
-Tasks:
-1. List current Vercel env vars on the project. Identify which of the 3
-   required (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
-   SUPABASE_SERVICE_ROLE_KEY) are missing or wrong.
-2. Pull missing values from the Supabase project (anon key, service_role
-   key) via Supabase MCP.
-3. Add/update env vars on Vercel via Vercel MCP for all 3 target
-   environments (production, preview, development).
-4. Trigger a fresh production deployment.
-5. Poll deployment until READY (or FAILED). Surface logs if FAILED.
-6. HTTP GET the production URL and report status code + first 200 chars
-   of HTML (just to confirm the page renders).
-7. Final report: production URL, deployment ID, all 3 env vars confirmed
-   present, smoke-test PASS.
-
-Use only MCP tools (mcp__supabase__*, mcp__vercel__*). Approve permission
-prompts inline.
-```
+- `vercel-mcp-no-env-management.md` — Vercel MCP has no env-var tool; fall back to `POST /v10/projects/.../env` with `$VERCEL_TOKEN`. Lists the full Vercel MCP surface so future sessions don't waste turns searching.
+- `supabase-mcp-no-service-role.md` — Supabase MCP only exposes anon + publishable keys (`get_publishable_keys`); the `service_role` secret must come from the user (paste) or from the Supabase Management API. Don't search for a non-existent MCP tool.
+- `socialplan-platform-ids.md` — Frozen IDs: Vercel project `prj_aXgCyx0ZXHOSoxpBjQ4i7Hxd1tUt`, team `team_hiKzDAS0wExU2NhAuY66ubPN`, Supabase ref `hxznewvcvpqiyzdyhwdd`, GitHub repo `rogerphamvn/socialplan_platform` (repoId `1245437684`). **Production branch is `claude/pending-request-QUx0g`, not `main`** — verify via `link.productionBranch` before assuming.
+- `MEMORY.md` — Index linking the three above so they auto-load in future sessions.
 
 ## Lessons captured (in claude-hub-private KG)
 
