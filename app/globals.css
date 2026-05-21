@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body { height: 100%; }
+  body {
+    @apply bg-canvas text-ink-900 antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+}
+
+@layer components {
+  .card { @apply bg-white border border-ink-100 rounded-card shadow-card; }
+  .card-soft { @apply bg-white border border-ink-100 rounded-card shadow-soft; }
+  .stat-pill { @apply inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full; }
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-ink-700
+           hover:bg-ink-50 transition-colors cursor-pointer;
+  }
+  .nav-item-active {
+    @apply bg-brand-50 text-brand-700 font-medium;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl
+           bg-brand-600 text-white text-sm font-medium hover:bg-brand-700
+           transition-colors disabled:opacity-50;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl
+           bg-white border border-ink-200 text-ink-800 text-sm font-medium
+           hover:bg-ink-50 transition-colors;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm
+           bg-white border border-ink-200 text-ink-700 hover:bg-ink-50 cursor-pointer
+           transition-colors;
+  }
+  .chip-active {
+    @apply bg-brand-50 border-brand-200 text-brand-700 font-medium;
+  }
+}
