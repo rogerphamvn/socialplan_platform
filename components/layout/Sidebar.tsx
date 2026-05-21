@@ -4,14 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home, Image as ImageIcon, Sparkles, Calendar, Megaphone,
-  Send, MapPin, BarChart3, FolderOpen, Settings, ChevronDown
+  Send, MapPin, BarChart3, FolderOpen, Settings, ChevronDown,
+  Wand2, Video,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const nav = [
   { href: "/", label: "Home", icon: Home },
   { href: "/content-studio", label: "Content Studio", icon: ImageIcon },
+  { href: "/content-creator", label: "Content Creator", icon: Wand2 },
   { href: "/ai-generator", label: "AI Generator", icon: Sparkles },
+  { href: "/video-studio", label: "Video Studio", icon: Video },
   { href: "/calendar", label: "Calendar", icon: Calendar },
   { href: "/campaigns", label: "Campaigns", icon: Megaphone },
   { href: "/social-auto-posting", label: "Social Auto Posting", icon: Send },
